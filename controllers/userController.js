@@ -1,75 +1,97 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
-// Generate JWT
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
 
-// @desc Register new user
-// @route POST /api/users/register
-// @access Public
 const registerUser = async (req, res) => {
-  const { name, email, password } = req.body;
+  try {
+    const { firstName, lastName, username, email, password } = req.body;
 
-  if (!name || !email || !password) {
-    return res.status(400).json({ message: 'Please fill all fields' });
-  }
+    if (!firstName || !lastName || !username || !email || !password) {
+      return res.status(400).json({ message: 'Please fill all fields' });
+    }
 
-  const userExists = await User.findOne({ email });
-  if (userExists) {
-    return res.status(400).json({ message: 'User already exists' });
-  }
-
-  const user = await User.create({ name, email, password });
-  if (user) {
-    res.status(201).json({
-      token: generateToken(user._id),
-      user: {
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+    const userExists = await User.findOne({
+      $or: [{ email }, { username }],
     });
-  } else {
-    res.status(400).json({ message: 'Invalid user data' });
+
+    if (userExists) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+
+    const user = await User.create({ firstName, lastName, username, email, password });
+
+    if (user) {
+      return res.status(201).json({
+        token: generateToken(user._id),
+        user: {
+          firstName: user.firstName,
+          lastName: user.lastName,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+        },
+      });
+    } else {
+      return res.status(400).json({ message: 'Invalid user data' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc Login user
-// @route POST /api/users/login
-// @access Public
 const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { usernameOrEmail, password } = req.body;
 
-  const user = await User.findOne({ email });
-  if (user && (await user.matchPassword(password))) {
-    res.json({
-      token: generateToken(user._id),
-      user: {
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+    if (!usernameOrEmail || !password) {
+      return res.status(400).json({ message: 'Please fill all fields' });
+    }
+
+    const user = await User.findOne({
+      $or: [{ email: usernameOrEmail }, { username: usernameOrEmail }],
     });
-  } else {
-    res.status(401).json({ message: 'Invalid email or password' });
+
+    if (user && (await user.matchPassword(password))) {
+      return res.json({
+        token: generateToken(user._id),
+        user: {
+          firstName: user.firstName,
+          lastName: user.lastName,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+        },
+      });
+    } else {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc Get user profile
-// @route GET /api/users/me
-// @access Private
 const getProfile = async (req, res) => {
-  const user = await User.findById(req.user.id);
-  if (user) {
-    res.json({
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    });
-  } else {
-    res.status(404).json({ message: 'User not found' });
+  try {
+    const user = await User.findById(req.user.id);
+    if (user) {
+      return res.json({
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      });
+    } else {
+      return res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
